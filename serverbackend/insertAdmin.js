@@ -4,9 +4,9 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// ===============================
-// MongoDB Atlas Connection
-// ===============================
+// ==========================================
+// MongoDB Atlas URI
+// ==========================================
 const MONGO_URI = process.env.MONGO_URI;
 
 if (!MONGO_URI) {
@@ -14,41 +14,37 @@ if (!MONGO_URI) {
   process.exit(1);
 }
 
-mongoose
-  .connect(MONGO_URI)
-  .then(() => {
-    console.log("✅ MongoDB Atlas Connected");
-    insertAdmins();
-  })
-  .catch((err) => {
-    console.error("❌ MongoDB Connection Error:", err.message);
-    process.exit(1);
-  });
-
-// ===============================
+// ==========================================
 // Admin Schema
-// ===============================
-const adminSchema = new mongoose.Schema({
-  email: {
-    type: String,
-    unique: true,
-    required: true,
-  },
+// ==========================================
+const adminSchema = new mongoose.Schema(
+  {
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
 
-  password: {
-    type: String,
-    required: true,
+    password: {
+      type: String,
+      required: true,
+    },
   },
-});
+  {
+    timestamps: true,
+  }
+);
 
-// ===============================
+// ==========================================
 // Admin Model
-// ===============================
+// ==========================================
 const Admin = mongoose.model("Admin", adminSchema);
 
-// ===============================
-// Admins to Insert
-// ===============================
+// ==========================================
+// Admins List
+// ==========================================
 const admins = [
   { email: "bh1@pu.com", password: "bh1@123" },
   { email: "bh2@pu.com", password: "bh2@123" },
@@ -71,19 +67,30 @@ const admins = [
   { email: "gh10@pu.com", password: "gh10@123" },
 ];
 
-// ===============================
+// ==========================================
 // Insert Admins
-// ===============================
+// ==========================================
 const insertAdmins = async () => {
   try {
-    for (const admin of admins) {
-      const exists = await Admin.findOne({
-        email: admin.email,
-      });
+    console.log("🔄 Connecting to MongoDB Atlas...");
 
-      // Already exists
+    await mongoose.connect(MONGO_URI);
+
+    console.log("✅ MongoDB Atlas Connected");
+    console.log("");
+
+    let inserted = 0;
+    let existing = 0;
+
+    for (const admin of admins) {
+      const email = admin.email.toLowerCase().trim();
+
+      // Check if admin already exists
+      const exists = await Admin.findOne({ email });
+
       if (exists) {
-        console.log(`⚠️ ${admin.email} already exists`);
+        console.log(`⚠️ ${email} already exists`);
+        existing++;
         continue;
       }
 
@@ -95,25 +102,31 @@ const insertAdmins = async () => {
 
       // Create admin
       await Admin.create({
-        email: admin.email,
+        email,
         password: hashedPassword,
       });
 
-      console.log(`✅ ${admin.email} inserted`);
+      console.log(`✅ ${email} inserted`);
+      inserted++;
     }
 
-    console.log("🎉 All admins processed successfully");
+    console.log("");
+    console.log("================================");
+    console.log("🎉 Admin seeding completed");
+    console.log(`✅ Inserted: ${inserted}`);
+    console.log(`⚠️ Already existed: ${existing}`);
+    console.log("================================");
 
+  } catch (error) {
+    console.error("");
+    console.error("❌ Error:", error.message);
+  } finally {
     await mongoose.connection.close();
-
     console.log("🔌 MongoDB connection closed");
-
-    process.exit(0);
-  } catch (err) {
-    console.error("❌ Error inserting admins:", err);
-
-    await mongoose.connection.close();
-
-    process.exit(1);
   }
 };
+
+// ==========================================
+// Start Script
+// ==========================================
+insertAdmins();
