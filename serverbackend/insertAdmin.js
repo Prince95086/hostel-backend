@@ -1,18 +1,54 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import dotenv from "dotenv";
 
-mongoose.connect("mongodb://127.0.0.1:27017/hostelDB")
-  .then(() => console.log("MongoDB Connected"));
+dotenv.config();
 
-// Schema
+// ===============================
+// MongoDB Atlas Connection
+// ===============================
+const MONGO_URI = process.env.MONGO_URI;
+
+if (!MONGO_URI) {
+  console.error("❌ MONGO_URI is not defined in .env");
+  process.exit(1);
+}
+
+mongoose
+  .connect(MONGO_URI)
+  .then(() => {
+    console.log("✅ MongoDB Atlas Connected");
+    insertAdmins();
+  })
+  .catch((err) => {
+    console.error("❌ MongoDB Connection Error:", err.message);
+    process.exit(1);
+  });
+
+// ===============================
+// Admin Schema
+// ===============================
 const adminSchema = new mongoose.Schema({
-  email: { type: String, unique: true },
-  password: String,
+  email: {
+    type: String,
+    unique: true,
+    required: true,
+  },
+
+  password: {
+    type: String,
+    required: true,
+  },
 });
 
+// ===============================
+// Admin Model
+// ===============================
 const Admin = mongoose.model("Admin", adminSchema);
 
-// 🔹 List of admins to add
+// ===============================
+// Admins to Insert
+// ===============================
 const admins = [
   { email: "bh1@pu.com", password: "bh1@123" },
   { email: "bh2@pu.com", password: "bh2@123" },
@@ -22,6 +58,7 @@ const admins = [
   { email: "bh6@pu.com", password: "bh6@123" },
   { email: "bh7@pu.com", password: "bh7@123" },
   { email: "bh8@pu.com", password: "bh8@123" },
+
   { email: "gh1@pu.com", password: "gh1@123" },
   { email: "gh2@pu.com", password: "gh2@123" },
   { email: "gh3@pu.com", password: "gh3@123" },
@@ -32,21 +69,31 @@ const admins = [
   { email: "gh8@pu.com", password: "gh8@123" },
   { email: "gh9@pu.com", password: "gh9@123" },
   { email: "gh10@pu.com", password: "gh10@123" },
-  
 ];
 
+// ===============================
+// Insert Admins
+// ===============================
 const insertAdmins = async () => {
   try {
-    for (let admin of admins) {
-      const exists = await Admin.findOne({ email: admin.email });
+    for (const admin of admins) {
+      const exists = await Admin.findOne({
+        email: admin.email,
+      });
 
+      // Already exists
       if (exists) {
-        console.log(`⚠ ${admin.email} already exists`);
+        console.log(`⚠️ ${admin.email} already exists`);
         continue;
       }
 
-      const hashedPassword = await bcrypt.hash(admin.password, 10);
+      // Hash password
+      const hashedPassword = await bcrypt.hash(
+        admin.password,
+        10
+      );
 
+      // Create admin
       await Admin.create({
         email: admin.email,
         password: hashedPassword,
@@ -55,12 +102,18 @@ const insertAdmins = async () => {
       console.log(`✅ ${admin.email} inserted`);
     }
 
-    console.log("🎉 All admins processed");
-    process.exit();
+    console.log("🎉 All admins processed successfully");
+
+    await mongoose.connection.close();
+
+    console.log("🔌 MongoDB connection closed");
+
+    process.exit(0);
   } catch (err) {
-    console.log(err);
+    console.error("❌ Error inserting admins:", err);
+
+    await mongoose.connection.close();
+
     process.exit(1);
   }
 };
-
-insertAdmins();
